@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walmart Bill Splitter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    color: #1a1a2e;
+  }
+
+  header {
+    background: #0071ce;
+    color: white;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,113,206,0.3);
+  }
+
+  header .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  header .logo span { color: #ffc220; }
+
+  header .subtitle {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-top: 2px;
+  }
+
+  /* Steps indicator */
+  .steps {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    padding: 24px 32px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+
+  .step::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: #d0d5dd;
+    z-index: 0;
+  }
+
+  .step:last-child::after { display: none; }
+
+  .step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d0d5dd;
+    color: #667085;
+    font-weight: 700;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+
+  .step.active .step-circle {
+    background: #0071ce;
+    color: white;
+  }
+
+  .step.done .step-circle {
+    background: #12b76a;
+    color: white;
+  }
+
+  .step-label {
+    font-size: 11px;
+    margin-top: 6px;
+    color: #667085;
+    font-weight: 500;
+  }
+
+  .step.active .step-label { color: #0071ce; font-weight: 700; }
+  .step.done .step-label { color: #12b76a; }
+
+  /* Panels */
+  .panel {
+    display: none;
+    max-width: 900px;
+    margin: 24px auto 40px;
+    padding: 0 24px;
+  }
+
+  .panel.active { display: block; }
+
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  .card h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #1a1a2e;
+  }
+
+  .card .desc {
+    font-size: 13px;
+    color: #667085;
+    margin-bottom: 24px;
+  }
+
+  /* Step 1 - People */
+  .people-input {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .people-input input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 2px solid #e4e7ec;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .people-input input:focus { border-color: #0071ce; }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #0071ce;
+    color: white;
+  }
+
+  .btn-primary:hover { background: #005fa3; }
+
+  .btn-success {
+    background: #12b76a;
+    color: white;
+  }
+
+  .btn-success:hover { background: #0e9057; }
+
+  .btn-danger {
+    background: #fee4e2;
+    color: #d92d20;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .btn-danger:hover { background: #fecdca; }
+
+  .people-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 48px;
+  }
+
+  .person-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #eff8ff;
+    border: 1.5px solid #b2ddff;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #175cd3;
+  }
+
+  .person-tag button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #175cd3;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.6;
+  }
+
+  .person-tag button:hover { opacity: 1; }
+
+  .empty-hint {
+    color: #98a2b3;
+    font-size: 13px;
+    padding: 8px 0;
+  }
+
+  /* Step 2 - Upload */
+  .upload-zone {
+    border: 2px dashed #b2ddff;
+    border-radius: 14px;
+    padding: 48px 24px;
+    text-align: center;
+    background: #f8fbff;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .upload-zone:hover { border-color: #0071ce; background: #eff8ff; }
+
+  .upload-zone .icon { font-size: 40px; margin-bottom: 12px; }
+
+  .upload-zone p {
+    color: #344054;
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .upload-zone small {
+    color: #98a2b3;
+    font-size: 12px;
+  }
+
+  #fileInput { display: none; }
+
+  .parsing-msg {
+    text-align: center;
+    padding: 20px;
+    color: #667085;
+    font-size: 14px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #e4e7ec;
+    border-top-color: #0071ce;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Items table */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+
+  .items-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: #f9fafb;
+    color: #667085;
+    font-weight: 600;
+    border-bottom: 1px solid #e4e7ec;
+  }
+
+  .items-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f2f4f7;
+    vertical-align: middle;
+  }
+
+  .items-table tr:hover td { background: #f9fafb; }
+
+  .totals-row {
+    background: #f9fafb;
+    font-weight: 600;
+    border-top: 2px solid #e4e7ec;
+  }
+
+  /* Step 3 - Assign */
+  .assign-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .items-pool h3, .baskets-area h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #667085;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .item-card {
+    background: white;
+    border: 1.5px solid #e4e7ec;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    cursor: grab;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .item-card:hover {
+    border-color: #0071ce;
+    box-shadow: 0 2px 8px rgba(0,113,206,0.12);
+    transform: translateY(-1px);
+  }
+
+  .item-card.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+  }
+
+  .item-card .item-name {
+    font-weight: 600;
+    color: #1a1a2e;
+    flex: 1;
+    margin-right: 8px;
+  }
+
+  .item-card .item-price {
+    font-weight: 700;
+    color: #0071ce;
+    white-space: nowrap;
+  }
+
+  .item-card .item-qty {
+    font-size: 11px;
+    color: #98a2b3;
+    margin-top: 2px;
+  }
+
+  .item-left { }
+
+  /* Baskets */
+  .baskets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  .basket {
+    border: 2px dashed #d0d5dd;
+    border-radius: 14px;
+    padding: 14px;
+    min-height: 160px;
+    transition: all 0.2s;
+    background: #fafafa;
+  }
+
+  .basket.drag-over {
+    border-color: #0071ce;
+    background: #eff8ff;
+    transform: scale(1.02);
+  }
+
+  .basket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .basket-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a1a2e;
+  }
+
+  .basket-total {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0071ce;
+  }
+
+  .basket-items { min-height: 80px; }
+
+  .basket-item {
+    background: white;
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .basket-item .bi-name {
+    flex: 1;
+    color: #344054;
+    font-weight: 500;
+  }
+
+  .basket-item .bi-price {
+    color: #0071ce;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .basket-item .bi-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #98a2b3;
+    font-size: 14px;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .basket-item .bi-remove:hover { color: #d92d20; }
+
+  .basket-empty {
+    color: #d0d5dd;
+    font-size: 12px;
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .unassigned-count {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #92400e;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+
+  .unassigned-count.all-done {
+    background: #d1fae5;
+    border-color: #6ee7b7;
+    color: #065f46;
+  }
+
+  /* Split picker modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    width: 360px;
+    max-width: 92vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+
+  .modal h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #1a1a2e;
+  }
+
+  .modal .modal-item-name {
+    font-size: 12px;
+    color: #667085;
+    margin-bottom: 6px;
+  }
+
+  .modal-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 7px;
+    border-radius: 8px;
+    border: 2px solid #e4e7ec;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: white;
+    color: #667085;
+    transition: all 0.15s;
+  }
+
+  .mode-btn.active {
+    border-color: #0071ce;
+    background: #eff8ff;
+    color: #0071ce;
+  }
+
+  .modal-people {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .modal-person-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 2px solid #e4e7ec;
+    border-radius: 10px;
+    transition: all 0.15s;
+    font-size: 14px;
+    font-weight: 600;
+    color: #344054;
+    user-select: none;
+  }
+
+  .modal-person-row.selected {
+    border-color: #0071ce;
+    background: #eff8ff;
+    color: #175cd3;
+  }
+
+  .modal-person-row input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    accent-color: #0071ce;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .modal-person-row .person-label {
+    flex: 1;
+  }
+
+  .modal-person-row .unit-input {
+    width: 64px;
+    padding: 4px 8px;
+    border: 1.5px solid #e4e7ec;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    color: #1a1a2e;
+  }
+
+  .modal-person-row .unit-input:focus { border-color: #0071ce; }
+
+  .inner-count-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f8fbff;
+    border: 1.5px solid #b2ddff;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #344054;
+    font-weight: 600;
+  }
+
+  .inner-count-row input {
+    width: 56px;
+    padding: 4px 8px;
+    border: 1.5px solid #b2ddff;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    color: #0071ce;
+  }
+
+  .inner-count-row input:focus { border-color: #0071ce; }
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    margin-left: 2px;
+  }
+
+  .frac-btn {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1.5px solid #b2ddff;
+    background: #f0f7ff;
+    color: #0071ce;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+
+  .frac-btn:hover { background: #dbeeff; }
+
+  .modal-person-row .unit-label {
+    font-size: 11px;
+    color: #98a2b3;
+    white-space: nowrap;
+  }
+
+  .modal-qty-status {
+    font-size: 12px;
+    text-align: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+
+  .modal-qty-status.ok { background: #d1fae5; color: #065f46; }
+  .modal-qty-status.warn { background: #fef3c7; color: #92400e; }
+  .modal-qty-status.err { background: #fee4e2; color: #d92d20; }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  .btn-split {
+    background: #f0f7ff;
+    color: #0071ce;
+    border: 1.5px solid #b2ddff;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-split:hover { background: #dbeeff; }
+
+  .reassign-btn {
+    background: none;
+    border: none;
+    font-size: 11px;
+    color: #0071ce;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  /* Step 4 - Output */
+  .split-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .split-card {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border-top: 4px solid #0071ce;
+  }
+
+  .split-card .sc-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 14px;
+  }
+
+  .split-card .sc-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #667085;
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f4f7;
+  }
+
+  .split-card .sc-item:last-of-type { border-bottom: none; }
+
+  .split-card .sc-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0071ce;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 2px solid #e4e7ec;
+  }
+
+  .output-text {
+    background: #1a1a2e;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+  }
+
+  .copy-btn {
+    background: #1a1a2e;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .copy-btn:hover { background: #2d2d4e; }
+  .copy-btn.copied { background: #12b76a; }
+
+  .step-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .btn-back {
+    background: #f2f4f7;
+    color: #344054;
+  }
+
+  .btn-back:hover { background: #e4e7ec; }
+
+  /* Shared badge */
+  .shared-badge {
+    font-size: 10px;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+
+  .tax-info {
+    font-size: 12px;
+    color: #667085;
+    margin-top: 6px;
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+
+  @media (max-width: 640px) {
+    .assign-layout { grid-template-columns: 1fr; }
+    .panel { padding: 0 12px; }
+    header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🛒 <span>Walmart</span> Splitter</div>
+    <div class="subtitle">Split your grocery bill, no drama</div>
+  </div>
+</header>
+
+<!-- Steps -->
+<div class="steps">
+  <div class="step active" id="step-indicator-1">
+    <div class="step-circle">1</div>
+    <div class="step-label">Add People</div>
+  </div>
+  <div class="step" id="step-indicator-2">
+    <div class="step-circle">2</div>
+    <div class="step-label">Upload Bill</div>
+  </div>
+  <div class="step" id="step-indicator-3">
+    <div class="step-circle">3</div>
+    <div class="step-label">Assign Items</div>
+  </div>
+  <div class="step" id="step-indicator-4">
+    <div class="step-circle">4</div>
+    <div class="step-label">Split</div>
+  </div>
+</div>
+
+<!-- Step 1: Add People -->
+<div class="panel active" id="panel-1">
+  <div class="card">
+    <h2>Who's splitting the bill?</h2>
+    <p class="desc">Add everyone's names before uploading the receipt.</p>
+
+    <div class="people-input">
+      <input type="text" id="personInput" placeholder="Enter a name (e.g. Pavan)" />
+      <button class="btn btn-primary" onclick="addPerson()">Add</button>
+    </div>
+
+    <div class="people-list" id="peopleList">
+      <span class="empty-hint">No people added yet. Add at least 2.</span>
+    </div>
+
+    <div class="step-actions">
+      <button class="btn btn-primary" onclick="goToStep(2)" id="nextToUpload" disabled>Next: Upload Bill →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: Upload PDF or Paste -->
+<div class="panel" id="panel-2">
+  <div class="card">
+    <h2>Add your Walmart Invoice</h2>
+    <p class="desc">Upload the PDF or paste the invoice text directly.</p>
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="mode-btn active" id="tabPdf" onclick="switchInputTab('pdf')">📄 Upload PDF</button>
+      <button class="mode-btn" id="tabPaste" onclick="switchInputTab('paste')">📋 Paste Text</button>
+    </div>
+
+    <!-- PDF upload -->
+    <div id="inputPdf">
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <div class="icon">📄</div>
+        <p>Click to upload Walmart invoice PDF</p>
+        <small>Only the PDF text layer is read, no data is sent anywhere</small>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf" onchange="handleFile(event)" />
+    </div>
+
+    <!-- Paste text -->
+    <div id="inputPaste" style="display:none">
+      <textarea id="pasteArea" placeholder="Paste the Walmart invoice text here. You can copy it from the browser page (Ctrl+A, Ctrl+C on the order page) or from the PDF." style="width:100%;height:200px;padding:12px 14px;border:2px solid #e4e7ec;border-radius:10px;font-size:13px;font-family:inherit;resize:vertical;outline:none;line-height:1.6" oninput="onPasteInput()"></textarea>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="parsePastedText()">Parse Text →</button>
+      </div>
+    </div>
+
+    <div id="parsingStatus"></div>
+    <div id="itemsPreview"></div>
+
+    <div class="step-actions">
+      <button class="btn btn-back" onclick="goToStep(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goToStep(3)" id="nextToAssign" disabled>Next: Assign Items →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3: Assign Items -->
+<div class="panel" id="panel-3">
+  <div class="card">
+    <h2>Drag items into people's baskets</h2>
+    <p class="desc">Drag each item from the left into the right person's basket. Items dragged to multiple people are split equally.</p>
+
+    <div id="unassignedStatus" class="unassigned-count"></div>
+
+    <div class="assign-layout">
+      <!-- Pool -->
+      <div class="items-pool">
+        <h3>Items to assign</h3>
+        <div id="itemPool"></div>
+      </div>
+
+      <!-- Baskets -->
+      <div class="baskets-area">
+        <h3>People's baskets</h3>
+        <div class="baskets-grid" id="basketsGrid"></div>
+      </div>
+    </div>
+
+    <div class="step-actions">
+      <button class="btn btn-back" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-success" onclick="goToStep(4)" id="nextToSplit">See the Split →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4: Output -->
+<div class="panel" id="panel-4">
+  <div class="card">
+    <h2>Here's the split</h2>
+    <p class="desc">Tax is divided equally among everyone. Copy the text below and paste it into Splitwise.</p>
+
+    <div class="split-cards" id="splitCards"></div>
+
+    <h3 style="font-size:14px;font-weight:700;color:#667085;margin-bottom:10px;">Splitwise-ready text</h3>
+    <div class="output-text" id="outputText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyOutput()">Copy to clipboard</button>
+
+    <div class="step-actions">
+      <button class="btn btn-back" onclick="goToStep(3)">← Back</button>
+      <button class="btn btn-primary" onclick="resetAll()">Start over</button>
+    </div>
+  </div>
+</div>
+
+<!-- Split Picker Modal -->
+<div class="modal-overlay" id="splitModal">
+  <div class="modal">
+    <h3>Assign item</h3>
+    <div class="modal-item-name" id="modalItemName"></div>
+    <div id="modalToggle"></div>
+    <div class="modal-people" id="modalPeople"></div>
+    <div id="modalQtyStatusWrap"></div>
+    <div class="modal-actions">
+      <button class="btn btn-back" onclick="closeSplitModal()">Cancel</button>
+      <button class="btn btn-primary" id="confirmSplitBtn" onclick="confirmSplit()">Assign</button>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ---- State ----
+let people = [];
+let items = [];   // { id, name, qty, price (per unit) }
+let billTotals = { subtotal: 0, tax: 0, savings: 0 };
+// assignments: { itemId: [personName, ...] }
+let assignments = {};
+let draggedItemId = null;
+let pricesAlreadyDiscounted = false; // true for webpage paste (prices are post-discount)
+
+// ---- Input tab switching ----
+function switchInputTab(tab) {
+  document.getElementById('inputPdf').style.display = tab === 'pdf' ? 'block' : 'none';
+  document.getElementById('inputPaste').style.display = tab === 'paste' ? 'block' : 'none';
+  document.getElementById('tabPdf').classList.toggle('active', tab === 'pdf');
+  document.getElementById('tabPaste').classList.toggle('active', tab === 'paste');
+}
+
+function onPasteInput() {
+  // Reset parsed state if user edits the textarea after parsing
+  const area = document.getElementById('pasteArea');
+  if (!area.value.trim()) {
+    document.getElementById('nextToAssign').disabled = true;
+    document.getElementById('itemsPreview').innerHTML = '';
+  }
+}
+
+function parsePastedText() {
+  const text = document.getElementById('pasteArea').value;
+  if (!text.trim()) return;
+  document.getElementById('parsingStatus').innerHTML = `<div class="parsing-msg"><span class="spinner"></span> Parsing...</div>`;
+  document.getElementById('itemsPreview').innerHTML = '';
+  document.getElementById('nextToAssign').disabled = true;
+  pricesAlreadyDiscounted = true; // webpage prices are already post-discount
+  setTimeout(() => {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    parseWalmartLines(lines);
+  }, 50);
+}
+
+// ---- Steps ----
+function goToStep(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + n).classList.add('active');
+  document.querySelectorAll('.step').forEach((s, i) => {
+    s.classList.remove('active', 'done');
+    if (i + 1 < n) s.classList.add('done');
+    if (i + 1 === n) s.classList.add('active');
+  });
+  if (n === 3) renderAssignView();
+  if (n === 4) renderOutput();
+}
+
+// ---- Step 1: People ----
+document.addEventListener('DOMContentLoaded', () => {
+  const personInput = document.getElementById('personInput');
+  if (personInput) personInput.addEventListener('keydown', e => { if (e.key === 'Enter') addPerson(); });
+});
+
+function addPerson() {
+  const personInput = document.getElementById('personInput');
+  const name = personInput.value.trim();
+  if (!name || people.includes(name)) { personInput.value = ''; return; }
+  people.push(name);
+  personInput.value = '';
+  renderPeopleList();
+}
+
+function removePerson(name) {
+  people = people.filter(p => p !== name);
+  renderPeopleList();
+}
+
+function renderPeopleList() {
+  const list = document.getElementById('peopleList');
+  if (people.length === 0) {
+    list.innerHTML = '<span class="empty-hint">No people added yet. Add at least 2.</span>';
+    document.getElementById('nextToUpload').disabled = true;
+    return;
+  }
+  list.innerHTML = people.map(p => `
+    <div class="person-tag">
+      ${p}
+      <button onclick="removePerson('${p}')" title="Remove">×</button>
+    </div>
+  `).join('');
+  document.getElementById('nextToUpload').disabled = people.length < 2;
+}
+
+// ---- Step 2: PDF Parsing ----
+async function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('parsingStatus').innerHTML = `<div class="parsing-msg"><span class="spinner"></span> Reading your PDF...</div>`;
+  document.getElementById('itemsPreview').innerHTML = '';
+  document.getElementById('nextToAssign').disabled = true;
+  pricesAlreadyDiscounted = false; // PDF prices are pre-discount
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    // Collect all text items with their y positions across all pages
+    let allItems = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+      content.items.forEach(item => {
+        if (!item.str.trim()) return;
+        // transform[5] is the y coordinate in PDF space; flip to reading order
+        const y = viewport.height - item.transform[5];
+        const x = item.transform[4];
+        allItems.push({ str: item.str.trim(), x, y });
+      });
+    }
+
+    // Group items into rows by y coordinate (within 3px = same line)
+    allItems.sort((a, b) => a.y - b.y || a.x - b.x);
+    const rows = [];
+    let currentRow = [];
+    let lastY = null;
+    for (const item of allItems) {
+      if (lastY === null || Math.abs(item.y - lastY) < 4) {
+        currentRow.push(item);
+      } else {
+        if (currentRow.length) rows.push(currentRow);
+        currentRow = [item];
+      }
+      lastY = item.y;
+    }
+    if (currentRow.length) rows.push(currentRow);
+
+    // Convert each row to a single string sorted by x
+    const lines = rows.map(row => {
+      row.sort((a, b) => a.x - b.x);
+      return row.map(r => r.str).join(' ');
+    });
+
+    parseWalmartLines(lines);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('parsingStatus').innerHTML = `<div class="parsing-msg" style="color:#d92d20">Could not read PDF. Make sure it's a Walmart invoice PDF with a text layer.</div>`;
+  }
+}
+
+function parseWalmartLines(lines) {
+  items = [];
+  billTotals = { subtotal: 0, tax: 0, savings: 0 };
+  let idCounter = 0;
+
+  // Clean markdown links: [Name](url) -> Name
+  // Also strip ~~strikethrough~~ content and "Was $X" lines
+  lines = lines
+    .map(l => l.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim())
+    .map(l => l.replace(/~~[^~]+~~/g, '').trim())
+    .filter(l => l.length > 0);
+
+  const skipRe = /^(subtotal|savings|tax|total|driver\s*tip|free delivery|walmart\+|order#|buyer|invoice|walmart|https?:|multipack|count per|add to cart|review item|\d+\.\d+¢|was\s+\$|\$[\d.]+\/ea|~~|\d+\s+delivered|want to see|substitution$|shopped$|substituted$)/i;
+
+  // ---- Strategy 1: Webpage paste format ----
+  // In this format, name is on its own line, then Qty N on its own line,
+  // then price $X.XX on its own line. Savings shown as "$X from savings" line.
+  // We scan for a "Qty N" line, grab the name from previous non-junk line,
+  // and the price from the next $X.XX line.
+
+  let webItems = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Match standalone "Qty N" line
+    const qtyMatch = line.match(/^Qty\s+(\d+)$/i);
+    if (!qtyMatch) continue;
+
+    const qty = parseInt(qtyMatch[1]);
+
+    // Look backwards for the item name (first non-junk, non-price line)
+    let name = '';
+    for (let j = i - 1; j >= Math.max(0, i - 6); j--) {
+      const candidate = lines[j].trim();
+      if (!candidate) continue;
+      if (skipRe.test(candidate)) continue;
+      if (/^\$[\d,]+\.\d{2}/.test(candidate)) continue;
+      if (/^\d+\s+(shopped|substituted|unavailable|picked)/i.test(candidate)) continue;
+      if (/^[\d.]+¢/.test(candidate)) continue;
+      if (/^multipack/i.test(candidate)) continue;
+      if (/^count per/i.test(candidate)) continue;
+      // Looks like a name
+      name = candidate;
+      break;
+    }
+    if (!name) continue;
+
+    // Look forward for the price — it's the first $X.XX line after Qty
+    // Skip "Was $X.XX" lines (strikethrough originals) and "$X from savings" lines
+    let price = 0;
+    for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+      const candidate = lines[j].trim();
+      if (/from savings/i.test(candidate)) continue; // savings note, not the price
+      if (/^was\s+\$/i.test(candidate)) continue;    // original price
+      if (/^~~/.test(candidate)) continue;           // strikethrough
+      const priceMatch = candidate.match(/^\$?([\d,]+\.\d{2})$/);
+      if (priceMatch) {
+        price = parseFloat(priceMatch[1].replace(',', ''));
+        break;
+      }
+    }
+    if (!price) continue;
+
+    // Also check for per-item savings on this item
+    let itemSavings = 0;
+    for (let j = i - 4; j < i + 6; j++) {
+      if (j < 0 || j >= lines.length) continue;
+      const sm = lines[j].trim().match(/^\$([\d,]+\.\d{2})\s+from savings$/i);
+      if (sm) { itemSavings = parseFloat(sm[1].replace(',', '')); break; }
+    }
+
+    name = name.replace(/\s+\d+\s+(shopped|substituted|unavailable|picked)$/i, '').trim();
+    webItems.push({ id: 'item-' + idCounter++, name, qty, price: price / qty, savedPerLine: itemSavings });
+  }
+
+  // Deduplicate web items by name
+  if (webItems.length > 0) {
+    const seen = new Set();
+    items = webItems.filter(it => {
+      const key = it.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Total savings from item-level savings notes
+    const totalItemSavings = items.reduce((s, it) => s + (it.savedPerLine || 0), 0);
+    if (totalItemSavings > 0) billTotals.savings = totalItemSavings;
+  }
+
+  // ---- Strategy 2: PDF invoice format ----
+  // "Item Name   N shopped   Qty N   $X.XX" all on one line
+  if (items.length === 0) {
+    const itemLineRe = /^(.+?)\s+(?:\d+\s+(?:shopped|substituted|unavailable|picked))?\s*Qty\s+(\d+)\s+\$(\d[\d,]*\.\d{2})$/i;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || skipRe.test(trimmed)) continue;
+      const m = trimmed.match(itemLineRe);
+      if (m) {
+        let name = m[1].trim().replace(/\s+\d+\s+(shopped|substituted|unavailable|picked)$/i, '').trim();
+        const qty = parseInt(m[2]);
+        const lineTotal = parseFloat(m[3].replace(',', ''));
+        if (qty >= 1 && qty <= 100 && lineTotal > 0 && lineTotal < 1000) {
+          items.push({ id: 'item-' + idCounter++, name, qty, price: lineTotal / qty });
+        }
+      }
+    }
+  }
+
+  // ---- Grab totals from any format ----
+  // Clean the flat text: strip strikethroughs and normalize
+  const flat = lines.join(' ')
+    .replace(/~~[^~]+~~/g, '')   // remove ~~strikethrough~~ content
+    .replace(/\s+/g, ' ');
+
+  if (!billTotals.tax) {
+    // Matches "Tax $2.11" or "Tax$2.11" or "Tax 2.11"
+    const t = flat.match(/\bTax\s*\$?([\d,]+\.\d{2})/i);
+    if (t) billTotals.tax = parseFloat(t[1].replace(',', ''));
+  }
+  if (!billTotals.savings) {
+    // Matches "Savings-$2.18" or "Savings -$2.18" or "Savings $2.18"
+    const s = flat.match(/\bSavings\s*-?\$?([\d,]+\.\d{2})/i);
+    if (s) billTotals.savings = parseFloat(s[1].replace(',', ''));
+  }
+  if (!billTotals.subtotal) {
+    // Matches "Subtotal $41.83" or "Subtotal$41.83" (after stripping strikethrough)
+    const sub = flat.match(/\bSubtotal\s*\$?([\d,]+\.\d{2})/i);
+    if (sub) billTotals.subtotal = parseFloat(sub[1].replace(',', ''));
+  }
+
+  // Final dedup by name+price
+  const seen2 = new Set();
+  items = items.filter(it => {
+    const key = it.name.toLowerCase() + '|' + it.price.toFixed(2);
+    if (seen2.has(key)) return false;
+    seen2.add(key);
+    return true;
+  });
+
+  if (items.length === 0) {
+    document.getElementById('parsingStatus').innerHTML = `<div class="parsing-msg" style="color:#d92d20">Couldn't find items. Try the other input method, or check that the text includes "Qty N" and prices.</div>`;
+    return;
+  }
+
+  if (!billTotals.subtotal) {
+    billTotals.subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+  }
+
+  assignments = {};
+  items.forEach(it => { assignments[it.id] = {}; });
+
+  document.getElementById('parsingStatus').innerHTML = '';
+  renderItemsPreview();
+  document.getElementById('nextToAssign').disabled = false;
+}
+
+function deleteItem(itemId) {
+  items = items.filter(it => it.id !== itemId);
+  delete assignments[itemId];
+  renderItemsPreview();
+}
+
+function renderItemsPreview() {
+  const container = document.getElementById('itemsPreview');
+  const totalItems = items.length;
+  let html = `
+    <p style="font-size:13px;color:#667085;margin:16px 0 8px">Found <strong>${totalItems} items</strong>. Remove any that don't belong.</p>
+    <table class="items-table">
+      <thead>
+        <tr><th>Item</th><th>Qty</th><th>Per Unit</th><th>Line Total</th><th></th></tr>
+      </thead>
+      <tbody>
+  `;
+  items.forEach(it => {
+    html += `<tr>
+      <td>${it.name}</td>
+      <td>${it.qty}</td>
+      <td>$${it.price.toFixed(2)}</td>
+      <td>$${(it.price * it.qty).toFixed(2)}</td>
+      <td><button class="btn btn-danger" onclick="deleteItem('${it.id}')" title="Remove item">✕</button></td>
+    </tr>`;
+  });
+  const tax = billTotals.tax;
+  const savings = billTotals.savings;
+  html += `</tbody>
+    <tfoot>
+      <tr class="totals-row"><td colspan="4">Tax</td><td>$${tax.toFixed(2)}</td></tr>
+      ${savings > 0 ? `<tr class="totals-row"><td colspan="4">Savings</td><td>-$${savings.toFixed(2)}</td></tr>` : ''}
+    </tfoot>
+    </table>`;
+  container.innerHTML = html;
+}
+
+// ---- Step 3: Assign ----
+function renderAssignView() {
+  renderPool();
+  renderBaskets();
+  updateUnassignedStatus();
+}
+
+// assignments: { itemId: { personName: unitCount } }
+// unitCount is a fraction of total qty (e.g. 2 out of 5 units)
+
+let splitModalItemId = null;
+let modalMode = 'equal'; // 'equal' or 'units'
+let innerCount = 0; // 0 means use raw qty fractions; >0 means pack has N inner units
+
+function getAssignedPeople(itemId) {
+  return Object.keys(assignments[itemId] || {});
+}
+
+function getPersonUnits(itemId, person) {
+  return (assignments[itemId] || {})[person] || 0;
+}
+
+function getPersonShare(itemId, person) {
+  const it = items.find(i => i.id === itemId);
+  if (!it) return 0;
+  const units = getPersonUnits(itemId, person);
+  return (units / it.qty) * (it.price * it.qty);
+}
+
+function openSplitModal(itemId) {
+  splitModalItemId = itemId;
+  const it = items.find(i => i.id === itemId);
+  modalMode = 'equal';
+  innerCount = 0;
+  renderModal();
+  document.getElementById('splitModal').classList.add('open');
+}
+
+function getEffectiveTotal() {
+  // If innerCount is set, that's the denominator; otherwise use item qty
+  const it = items.find(i => i.id === splitModalItemId);
+  return innerCount > 0 ? innerCount : it.qty;
+}
+
+function renderModal() {
+  const it = items.find(i => i.id === splitModalItemId);
+  if (!it) return;
+
+  document.getElementById('modalItemName').textContent =
+    `${it.name} — $${(it.price * it.qty).toFixed(2)} (Qty: ${it.qty})`;
+
+  const toggleHtml = `
+    <div class="modal-mode-toggle">
+      <button class="mode-btn ${modalMode === 'equal' ? 'active' : ''}" onclick="setModalMode('equal')">Split equally</button>
+      <button class="mode-btn ${modalMode === 'units' ? 'active' : ''}" onclick="setModalMode('units')">By quantity</button>
+    </div>`;
+
+  const existing = assignments[splitModalItemId] || {};
+  const effTotal = getEffectiveTotal();
+
+  // Inner count row — only shown in units mode
+  const innerCountHtml = modalMode === 'units' ? `
+    <div class="inner-count-row">
+      <span>📦 Pack size:</span>
+      <input type="number" min="1" id="innerCountInput" value="${innerCount > 0 ? innerCount : it.qty}"
+        oninput="onInnerCountChange()" placeholder="${it.qty}">
+      <span style="color:#667085;font-weight:400">individual units inside</span>
+    </div>` : '';
+
+  const fracs = [];
+
+  let peopleHtml = '';
+  if (modalMode === 'equal') {
+    peopleHtml = people.map(p => {
+      const checked = existing[p] !== undefined ? 'checked' : '';
+      const selected = existing[p] !== undefined ? 'selected' : '';
+      return `<label class="modal-person-row ${selected}" id="mrow-${p}">
+        <input type="checkbox" value="${p}" ${checked} onchange="toggleEqualRow('${p}')">
+        <span class="person-label">${p}</span>
+      </label>`;
+    }).join('');
+  } else {
+    peopleHtml = people.map(p => {
+      const storedFrac = existing[p] !== undefined ? existing[p] : 0;
+      const displayVal = storedFrac > 0 ? +(storedFrac * effTotal / it.qty).toFixed(4) : 0;
+      const selected = storedFrac > 0 ? 'selected' : '';
+      return `<div class="modal-person-row ${selected}" id="mrow-${p}">
+        <span class="person-label" style="flex:1;min-width:80px">${p}</span>
+        <input class="unit-input" type="text" inputmode="decimal"
+          value="${displayVal}" id="units-${p}"
+          oninput="onUnitInput('${p}')"
+          placeholder="0">
+        <span class="unit-label">/ ${effTotal}</span>
+      </div>`;
+    }).join('');
+  }
+
+  let statusHtml = '';
+  if (modalMode === 'units') {
+    const preAssigned = +Object.values(existing).reduce((s, v) => s + (v * effTotal / it.qty), 0).toFixed(4);
+    const remaining = +(effTotal - preAssigned).toFixed(4);
+    const cls = Math.abs(preAssigned - effTotal) < 0.001 ? 'ok' : preAssigned > effTotal ? 'err' : 'warn';
+    const msg = Math.abs(preAssigned - effTotal) < 0.001
+      ? `✅ All ${effTotal} units assigned`
+      : preAssigned > effTotal
+      ? `❌ Over-assigned by ${+(preAssigned - effTotal).toFixed(2)} units`
+      : `${preAssigned} of ${effTotal} assigned — ${remaining} remaining`;
+    statusHtml = `<div class="modal-qty-status ${cls}" id="modalQtyStatus">${msg}</div>`;
+  }
+
+  document.getElementById('modalToggle').innerHTML = toggleHtml;
+  document.getElementById('modalPeople').innerHTML = `${innerCountHtml}${peopleHtml}`;
+  document.getElementById('modalQtyStatusWrap').innerHTML = statusHtml;
+  updateConfirmBtn();
+}
+
+function onInnerCountChange() {
+  const input = document.getElementById('innerCountInput');
+  const val = parseInt(input.value);
+  const it = items.find(i => i.id === splitModalItemId);
+  innerCount = (!val || val < 1) ? it.qty : val;
+  // Reset assignments when pack size changes
+  assignments[splitModalItemId] = {};
+  // Re-render just the people rows and status without full modal reset
+  renderModal();
+}
+
+function setUnitFraction(person, fracUnits) {
+  const input = document.getElementById('units-' + person);
+  if (!input) return;
+  input.value = fracUnits;
+  onUnitInput(person);
+}
+
+function setModalMode(mode) {
+  modalMode = mode;
+  innerCount = 0;
+  assignments[splitModalItemId] = {};
+  renderModal();
+}
+
+function toggleEqualRow(person) {
+  const cb = document.querySelector(`#mrow-${person} input[type=checkbox]`);
+  const row = document.getElementById('mrow-' + person);
+  row.classList.toggle('selected', cb.checked);
+  updateConfirmBtn();
+}
+
+function onUnitInput(person) {
+  const it = items.find(i => i.id === splitModalItemId);
+  const effTotal = getEffectiveTotal();
+  const input = document.getElementById('units-' + person);
+  const raw = input.value;
+
+  // Allow typing in progress: don't clamp while user is mid-type (e.g. "0." or "1.")
+  const val = parseFloat(raw);
+  const isValid = !isNaN(val) && val >= 0;
+
+  const row = document.getElementById('mrow-' + person);
+  row.classList.toggle('selected', isValid && val > 0);
+
+  const total = +people.reduce((s, p) => {
+    const v = parseFloat(document.getElementById('units-' + p)?.value || 0);
+    return s + (isNaN(v) ? 0 : v);
+  }, 0).toFixed(4);
+
+  const remaining = +(effTotal - total).toFixed(4);
+  const statusEl = document.getElementById('modalQtyStatus');
+  if (statusEl) {
+    if (Math.abs(total - effTotal) < 0.001) {
+      statusEl.className = 'modal-qty-status ok';
+      statusEl.textContent = `✅ All ${effTotal} units assigned`;
+    } else if (total > effTotal + 0.001) {
+      statusEl.className = 'modal-qty-status err';
+      statusEl.textContent = `❌ Over-assigned by ${+(total - effTotal).toFixed(2)} units`;
+    } else {
+      statusEl.className = 'modal-qty-status warn';
+      statusEl.textContent = `${total} of ${effTotal} assigned — ${remaining} remaining`;
+    }
+  }
+  updateConfirmBtn();
+}
+
+function updateConfirmBtn() {
+  const btn = document.getElementById('confirmSplitBtn');
+  if (!btn) return;
+  const it = items.find(i => i.id === splitModalItemId);
+  if (!it) return;
+  const effTotal = getEffectiveTotal();
+
+  if (modalMode === 'equal') {
+    const anyChecked = people.some(p => document.querySelector(`#mrow-${p} input[type=checkbox]`)?.checked);
+    btn.disabled = !anyChecked;
+  } else {
+    const total = +people.reduce((s, p) => {
+      const v = parseFloat(document.getElementById('units-' + p)?.value || 0);
+      return s + (isNaN(v) ? 0 : v);
+    }, 0).toFixed(4);
+    btn.disabled = Math.abs(total - effTotal) > 0.001 || total === 0;
+  }
+}
+
+function closeSplitModal() {
+  splitModalItemId = null;
+  document.getElementById('splitModal').classList.remove('open');
+}
+
+function confirmSplit() {
+  if (!splitModalItemId) return;
+  const it = items.find(i => i.id === splitModalItemId);
+  const effTotal = getEffectiveTotal();
+
+  if (modalMode === 'equal') {
+    const checked = [...document.querySelectorAll('#modalPeople input:checked')].map(cb => cb.value);
+    if (checked.length === 0) { closeSplitModal(); return; }
+    const unitsEach = it.qty / checked.length;
+    assignments[splitModalItemId] = {};
+    checked.forEach(p => { assignments[splitModalItemId][p] = unitsEach; });
+  } else {
+    assignments[splitModalItemId] = {};
+    people.forEach(p => {
+      const v = parseFloat(document.getElementById('units-' + p)?.value || 0);
+      if (v > 0) {
+        // Convert inner units back to fraction of invoice qty
+        assignments[splitModalItemId][p] = (v / effTotal) * it.qty;
+      }
+    });
+  }
+
+  closeSplitModal();
+  renderAssignView();
+}
+
+document.getElementById('splitModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSplitModal();
+});
+
+function renderPool() {
+  const pool = document.getElementById('itemPool');
+  const unassigned = items.filter(it => Object.keys(assignments[it.id] || {}).length === 0);
+  if (unassigned.length === 0) {
+    pool.innerHTML = '<div style="color:#98a2b3;font-size:13px;text-align:center;padding:20px 0">All items assigned! ✅</div>';
+    return;
+  }
+  pool.innerHTML = unassigned.map(it => `
+    <div class="item-card" id="card-${it.id}">
+      <div class="item-left">
+        <div class="item-name">${it.name}</div>
+        <div class="item-qty" style="color:#667085;font-size:12px">Qty ${it.qty} &mdash; $${(it.price * it.qty).toFixed(2)}</div>
+      </div>
+      <button class="btn-split" onclick="openSplitModal('${it.id}')">Assign 🔀</button>
+    </div>
+  `).join('');
+}
+
+function renderBaskets() {
+  const grid = document.getElementById('basketsGrid');
+  grid.innerHTML = people.map(person => {
+    const personItems = items.filter(it => (assignments[it.id] || {})[person] > 0);
+    const total = personItems.reduce((s, it) => s + getPersonShare(it.id, person), 0);
+
+    const itemsHtml = personItems.length === 0
+      ? '<div class="basket-empty">No items yet</div>'
+      : personItems.map(it => {
+          const myUnits = getPersonUnits(it.id, person);
+          const totalPeople = Object.keys(assignments[it.id]).length;
+          const myShare = getPersonShare(it.id, person);
+          const isUneven = myUnits !== it.qty / totalPeople;
+          const unitLabel = it.qty > 1
+            ? `<span class="shared-badge">${Number.isInteger(myUnits) ? myUnits : myUnits.toFixed(1)}/${it.qty} units</span>`
+            : totalPeople > 1 ? `<span class="shared-badge">÷${totalPeople}</span>` : '';
+          return `<div class="basket-item">
+            <div style="flex:1;min-width:0">
+              <div class="bi-name">${it.name} ${unitLabel}</div>
+            </div>
+            <span class="bi-price">$${myShare.toFixed(2)}</span>
+            <button class="bi-remove" onclick="reassignItem('${it.id}')" title="Reassign">✏️</button>
+            <button class="bi-remove" onclick="removeFromBasket('${it.id}')" title="Remove">×</button>
+          </div>`;
+        }).join('');
+
+    return `<div class="basket" data-person="${person}">
+      <div class="basket-header">
+        <span class="basket-name">${person}</span>
+        <span class="basket-total">$${total.toFixed(2)}</span>
+      </div>
+      <div class="basket-items">${itemsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function reassignItem(itemId) {
+  openSplitModal(itemId);
+}
+
+function removeFromBasket(itemId) {
+  assignments[itemId] = {};
+  renderAssignView();
+}
+
+function updateUnassignedStatus() {
+  const count = items.filter(it => Object.keys(assignments[it.id] || {}).length === 0).length;
+  const el = document.getElementById('unassignedStatus');
+  if (count === 0) {
+    el.className = 'unassigned-count all-done';
+    el.textContent = '✅ All items assigned! Ready to see the split.';
+  } else {
+    el.className = 'unassigned-count';
+    el.textContent = `${count} item${count !== 1 ? 's' : ''} still unassigned. Hit Assign on each one.`;
+  }
+}
+
+// ---- Step 4: Output ----
+function shortenName(name) {
+  name = name.replace(/^Great Value\s+/i, '');
+  name = name.replace(/^Freshness Guaranteed\s+/i, '');
+  name = name.replace(/^Mainstays\s+/i, '');
+  name = name.replace(/^Tortilla Land Ready to Cook\s*/i, 'Flour Tortillas');
+  name = name.replace(/^Grade AA Large White\s+/i, '');
+  name = name.replace(/^Fresh\s+/i, '');
+  name = name.replace(/^Individually Plastic Wrapp\w*\s*/i, 'American Cheese');
+  name = name.replace(/^Authentic Royal Naturally\w*\s*/i, 'Basmati Rice');
+  name = name.replace(/^(\d+)%\s+/i, '$1% ');
+  name = name.replace(/\s{2,}/g, ' ').trim();
+  if (name.length > 26) name = name.slice(0, 24).trim() + '…';
+  return name;
+}
+
+function renderOutput() {
+  const peopleCount = people.length;
+  const taxPerPerson = +(billTotals.tax / peopleCount).toFixed(2);
+  const totalSavings = billTotals.savings || 0;
+
+  // Order subtotal = sum of all item line totals (before savings)
+  const orderSubtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+
+  const splits = people.map(person => {
+    const personItems = items.filter(it => (assignments[it.id] || {})[person] > 0);
+
+    const itemLines = personItems.map(it => {
+      const myUnits = getPersonUnits(it.id, person);
+      const totalAssigned = Object.keys(assignments[it.id]).length;
+      const lineTotal = it.price * it.qty;
+      const rawShare = (myUnits / it.qty) * lineTotal;
+
+      // Build label
+      let label = shortenName(it.name);
+      if (it.qty > 1 && totalAssigned === 1) {
+        label += ` x${it.qty}`;
+      } else if (it.qty > 1 && totalAssigned > 1) {
+        const myInt = Number.isInteger(myUnits) ? myUnits : myUnits.toFixed(1);
+        label += ` (${myInt} of ${it.qty})`;
+      } else if (it.qty === 1 && totalAssigned > 1) {
+        label += ` (1/${totalAssigned})`;
+      }
+
+      return { label, rawAmount: rawShare };
+    });
+
+    // Person's raw subtotal before savings
+    const personSubtotal = itemLines.reduce((s, l) => s + l.rawAmount, 0);
+
+    // Only apply savings deduction for PDF (pre-discount prices)
+    // For paste, prices are already discounted so savings are already baked in
+    const personSavings = (!pricesAlreadyDiscounted && orderSubtotal > 0)
+      ? (personSubtotal / orderSubtotal) * totalSavings
+      : 0;
+
+    const savingsRatio = personSubtotal > 0 ? personSavings / personSubtotal : 0;
+    const finalItemLines = itemLines.map(l => ({
+      label: l.label,
+      amount: +(l.rawAmount * (1 - savingsRatio)).toFixed(2)
+    }));
+
+    const itemsTotal = finalItemLines.reduce((s, l) => s + l.amount, 0);
+    const grandTotal = +(itemsTotal + taxPerPerson).toFixed(2);
+
+    return { person, finalItemLines, personSubtotal, personSavings, itemsTotal, taxPerPerson, grandTotal, peopleCount };
+  });
+
+  // Visual cards
+  const cardsHtml = splits.map(s => `
+    <div class="split-card">
+      <div class="sc-name">${s.person}</div>
+      ${s.finalItemLines.map(l => `
+        <div class="sc-item">
+          <span>${l.label}</span>
+          <span>$${l.amount.toFixed(2)}</span>
+        </div>
+      `).join('')}
+      ${s.personSavings > 0 ? `
+      <div class="sc-item" style="color:#12b76a;font-weight:600">
+        <span>Savings applied</span>
+        <span>-$${s.personSavings.toFixed(2)}</span>
+      </div>` : ''}
+      <div class="sc-item">
+        <span>Tax (1/${s.peopleCount})</span>
+        <span>$${s.taxPerPerson.toFixed(2)}</span>
+      </div>
+      <div class="sc-total">
+        <span>Total</span>
+        <span>$${s.grandTotal.toFixed(2)}</span>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('splitCards').innerHTML = cardsHtml;
+
+  // Splitwise text — no savings line, baked into item prices
+  let text = '';
+  splits.forEach(s => {
+    text += `${s.person} - $${s.grandTotal.toFixed(2)}\n\n`;
+    s.finalItemLines.forEach(l => { text += `${l.label}: $${l.amount.toFixed(2)}\n`; });
+    text += `Tax (1/${s.peopleCount}): $${s.taxPerPerson.toFixed(2)}\n\n`;
+  });
+  document.getElementById('outputText').textContent = text.trim();
+}
+
+function copyOutput() {
+  const text = document.getElementById('outputText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy to clipboard'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function resetAll() {
+  people = [];
+  items = [];
+  billTotals = { subtotal: 0, tax: 0, savings: 0 };
+  assignments = {};
+  draggedItemId = null;
+  document.getElementById('peopleList').innerHTML = '<span class="empty-hint">No people added yet. Add at least 2.</span>';
+  document.getElementById('nextToUpload').disabled = true;
+  document.getElementById('parsingStatus').innerHTML = '';
+  document.getElementById('itemsPreview').innerHTML = '';
+  document.getElementById('nextToAssign').disabled = true;
+  pricesAlreadyDiscounted = false;
+  document.getElementById('fileInput').value = '';
+  goToStep(1);
+}
+</script>
+</body>
+</html>
